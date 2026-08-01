@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>金爺當沖模擬器 - 精準技術盤口狙擊手</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 隱藏滾動條但保持功能 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* 動態閃爍動畫 */
+        @keyframes pulse-fast {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .animate-pulse-fast { animation: pulse-fast 0.8s infinite; }
+        
+        /* 台股顏色定義: 漲為紅(Up), 跌為綠(Down) */
+        .text-tw-up { color: #ef4444; }
+        .text-tw-down { color: #22c55e; }
+        .bg-tw-up { background-color: #ef4444; }
+        .bg-tw-down { background-color: #22c55e; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col select-none overflow-x-hidden">
+
+    <!-- 頂部資訊列 (Header & HUD) -->
+    <header class="bg-slate-900 border-b border-slate-800 p-3 sticky top-0 z-30 shadow-lg">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <!-- 標題與金爺頭像 -->
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-xl font-black shadow-inner shadow-amber-500/50">
+                    👑
+                </div>
+                <div>
+                    <h1 class="font-black text-lg md:text-xl text-amber-400 tracking-wider flex items-center gap-2">
+                        金爺當沖模擬器 
+                        <span id="levelBadge" class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-normal border border-slate-700">關卡 1</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">布林軌道 & KD 雙向當沖特訓</p>
+                </div>
+            </div>
+
+            <!-- 資產與損益 HUD -->
+            <div class="flex items-center gap-4 text-sm bg-slate-950 px-4 py-2 rounded-xl border border-slate-800">
+                <div>
+                    <div class="text-xs text-slate-400">總資產 (Cash)</div>
+                    <div id="totalAssetsDisplay" class="font-mono font-bold text-base text-slate-100">$1,000,000</div>
+                </div>
+                <div class="h-8 w-px bg-slate-800"></div>
+                <div>
+                    <div class="text-xs text-slate-400">未實現損益 (Unrealized)</div>
+                    <div id="pnlDisplay" class="font-mono font-bold text-base text-slate-400">$0 (0.00%)</div>
+                </div>
+                <div class="h-8 w-px bg-slate-800"></div>
+                <div>
+                    <div class="text-xs text-slate-400">目前持倉 (Position)</div>
+                    <div id="positionDisplay" class="font-mono font-bold text-base text-slate-300">無部位</div>
+                </div>
+            </div>
+
+            <!-- 速度控制與關卡選單 -->
+            <div class="flex items-center gap-2">
+                <button id="btnPause" class="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs font-bold border border-slate-700 transition">⏸️ 暫停</button>
+                <button id="btnSpeed1" class="px-2.5 py-1.5 rounded bg-amber-500 text-slate-950 text-xs font-bold transition">1x</button>
+                <button id="btnSpeed2" class="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs font-bold border border-slate-700 transition">2x</button>
+                <button id="btnSpeed5" class="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs font-bold border border-slate-700 transition">5x</button>
+                <button id="btnSelectLevel" class="ml-2 px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition">切換關卡</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主遊戲介面區 -->
+    <main class="max-w-7xl w-full mx-auto p-2 md:p-4 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+        <!-- 左側：K線圖表 & KD指標 (8 Cols) -->
+        <section class="lg:col-span-8 flex flex-col gap-3">
+            
+            <!-- 股票即時頭部資訊 -->
+            <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span id="stockNameDisplay" class="font-bold text-slate-200">2330 妖王科技</span>
+                        <span id="stockPriceDisplay" class="font-mono text-2xl font-black text-tw-up">100.0</span>
+                        <span id="stockChangeDisplay" class="font-mono text-sm text-tw-up font-bold">+2.5 (+2.56%)</span>
+                    </div>
+                    <div class="text-xs text-slate-400 flex gap-4 mt-1">
+                        <span>開: <span id="openPrice" class="font-mono text-slate-200">98.0</span></span>
+                        <span>高: <span id="highPrice" class="font-mono text-tw-up">102.5</span></span>
+                        <span>低: <span id="lowPrice" class="font-mono text-tw-down">97.5</span></span>
+                        <span>總量: <span id="totalVolume" class="font-mono text-amber-400">1,240 張</span></span>
+                    </div>
+                </div>
+
+                <!-- KD 指標即時讀數 -->
+                <div class="text-right bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+                    <div class="text-xs text-slate-400 font-bold mb-1">9,3,3 KD 指標</div>
+                    <div class="flex gap-3 text-sm font-mono font-bold">
+                        <span class="text-red-400">K: <span id="valK">0.0</span></span>
+                        <span class="text-yellow-400">D: <span id="valD">0.0</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Canvas 圖表容器 -->
+            <div class="bg-slate-900 rounded-xl border border-slate-800 p-2 flex-1 flex flex-col min-h-[380px] relative">
+                <canvas id="chartCanvas" class="w-full h-full block rounded bg-slate-950 cursor-crosshair"></canvas>
+                
+                <!-- 交叉放空/做多訊號浮水印浮層 -->
+                <div id="signalBadge" class="hidden absolute top-4 left-4 text-white font-bold text-xs px-3 py-1.5 rounded-full shadow-lg animate-pulse-fast">
+                    <!-- 內容由 JS 動態填入 -->
+                </div>
+            </div>
+
+            <!-- 金爺語錄 & 戰術即時指導 -->
+            <div class="bg-gradient-to-r from-slate-900 via-amber-950/30 to-slate-900 p-3.5 rounded-xl border border-amber-500/30 flex items-start gap-3 shadow-md">
+                <div class="text-3xl">👨‍💼</div>
+                <div class="flex-1">
+                    <div class="text-xs text-amber-400 font-bold tracking-wider mb-0.5">金爺戰術教練 (MR. KING)</div>
+                    <div id="kingSpeech" class="text-sm text-slate-200 font-medium">
+                        「注意看！布林軌道上下緣是極佳的轉折點。配合 KD 指標的超買超賣，順勢做多或逆勢放空，靈活操作才是當沖王道！」
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 右側：五檔盤口 (Level 2) & 內外盤 (4 Cols) -->
+        <section class="lg:col-span-4 flex flex-col gap-3">
+            
+            <!-- 五檔報價區 -->
+            <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 flex flex-col gap-2">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span class="text-xs font-bold text-slate-300 flex items-center gap-1">
+                        📊 五檔委買委賣 (Level 2)
+                    </span>
+                    <span class="text-[10px] text-slate-500">秒級盤口即時撮合</span>
+                </div>
+
+                <!-- 委賣五檔 (Sellers) -->
+                <div class="flex flex-col gap-1 text-xs font-mono">
+                    <div id="askContainer" class="flex flex-col gap-0.5"></div>
+
+                    <!-- 市價分隔線 -->
+                    <div class="my-1 border-y border-dashed border-slate-700 py-1 text-center bg-slate-950 rounded flex justify-between px-3 items-center">
+                        <span class="text-[11px] text-slate-400">成交現價</span>
+                        <span id="currentTickPrice" class="font-bold text-tw-up text-sm">100.0</span>
+                    </div>
+
+                    <!-- 委買五檔 (Buyers) -->
+                    <div id="bidContainer" class="flex flex-col gap-0.5"></div>
+                </div>
+
+                <!-- 內外盤成交比 -->
+                <div class="mt-2 pt-2 border-t border-slate-800">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-tw-down font-bold">內盤(賣方主動): <span id="innerRatio">50%</span></span>
+                        <span class="text-tw-up font-bold">外盤(買方主動): <span id="outerRatio">50%</span></span>
+                    </div>
+                    <div class="h-2 rounded-full bg-slate-800 overflow-hidden flex">
+                        <div id="innerBar" class="bg-tw-down h-full transition-all duration-300" style="width: 50%;"></div>
+                        <div id="outerBar" class="bg-tw-up h-full transition-all duration-300" style="width: 50%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 交易操作面板 (Trading Panel) -->
+            <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-800 flex flex-col gap-3 mt-auto">
+                <div class="text-xs font-bold text-slate-300">⚡ 雙向當沖控制台</div>
+
+                <!-- 部位選擇拉桿 / 按鈕 -->
+                <div>
+                    <div class="text-[11px] text-slate-400 mb-1 flex justify-between">
+                        <span>選擇下單張數比例</span>
+                        <span id="selectedQtyText" class="text-amber-400 font-bold">10 張</span>
+                    </div>
+                    <div class="grid grid-cols-4 gap-1.5">
+                        <button class="pos-btn border border-slate-700 bg-slate-800 hover:bg-slate-700 py-1 rounded text-xs text-slate-200" data-pct="0.1">10%</button>
+                        <button class="pos-btn border border-slate-700 bg-slate-800 hover:bg-slate-700 py-1 rounded text-xs text-slate-200" data-pct="0.25">25%</button>
+                        <button class="pos-btn border border-slate-700 bg-slate-800 hover:bg-slate-700 py-1 rounded text-xs text-slate-200" data-pct="0.5">50%</button>
+                        <button class="pos-btn border border-slate-700 bg-slate-800 hover:bg-slate-700 py-1 rounded text-xs text-slate-200" data-pct="1.0">全押</button>
+                    </div>
+                </div>
+
+                <!-- 下單主按鈕 (多/空/平倉) -->
+                <div class="grid grid-cols-2 gap-2 mb-1">
+                    <button id="btnBuy" class="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-black py-2.5 rounded-xl shadow-lg shadow-red-900/40 text-sm border border-red-500/50 flex flex-col items-center justify-center active:scale-95 transition disabled:opacity-40 disabled:pointer-events-none">
+                        <span>🔴 買進 (做多)</span>
+                        <span class="text-[10px] font-normal opacity-80">Buy Long</span>
+                    </button>
+                    <button id="btnShort" class="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-black py-2.5 rounded-xl shadow-lg shadow-emerald-900/40 text-sm border border-emerald-500/50 flex flex-col items-center justify-center active:scale-95 transition disabled:opacity-40 disabled:pointer-events-none">
+                        <span>🟢 賣出 (放空)</span>
+                        <span class="text-[10px] font-normal opacity-80">Sell Short</span>
+                    </button>
+                </div>
+                
+                <button id="btnCover" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-black py-3 rounded-xl shadow-lg text-sm border border-slate-500/50 flex flex-col items-center justify-center active:scale-95 transition disabled:opacity-40 disabled:pointer-events-none" disabled>
+                    <span>🔄 獲利了結 (平倉)</span>
+                    <span class="text-[10px] font-normal opacity-80">Close Position</span>
+                </button>
+
+                <!-- 快速市價停損按鈕 -->
+                <button id="btnStopLoss" class="w-full bg-slate-800 hover:bg-red-950/50 hover:text-red-400 border border-slate-700 hover:border-red-800 py-1.5 rounded-lg text-xs font-bold text-slate-400 transition">
+                    ⚠️ 緊急市價全數停損 (Stop Loss)
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <!-- 選擇關卡 Modal -->
+    <div id="levelModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <h2 class="text-xl font-black text-amber-400 mb-1 flex items-center gap-2">🎯 選擇關卡章節</h2>
+            <p class="text-xs text-slate-400 mb-4">掌握不同行情類型下的當沖眉角與風險控管</p>
+            
+            <div class="flex flex-col gap-3">
+                <button class="level-select-btn text-left p-3 rounded-xl border border-slate-700 hover:border-amber-500 bg-slate-800/50 hover:bg-slate-800 transition" data-level="1">
+                    <div class="font-bold text-sm text-slate-200">關卡一：觸頂回落 - 布林上軌放空</div>
+                    <div class="text-xs text-slate-400 mt-1">股價急拉觸碰布林上軌，KD 指標 > 80 高檔死叉，五檔賣單壓頂。獲利目標 +3%</div>
+                </button>
+                <button class="level-select-btn text-left p-3 rounded-xl border border-slate-700 hover:border-amber-500 bg-slate-800/50 hover:bg-slate-800 transition" data-level="2">
+                    <div class="font-bold text-sm text-slate-200">關卡二：超賣反彈 - 布林下軌做多</div>
+                    <div class="text-xs text-slate-400 mt-1">股價急殺觸碰布林下軌，KD 指標 < 20 低檔金叉，買盤湧現。獲利目標 +3%</div>
+                </button>
+                <button class="level-select-btn text-left p-3 rounded-xl border border-slate-700 hover:border-amber-500 bg-slate-800/50 hover:bg-slate-800 transition" data-level="3">
+                    <div class="font-bold text-sm text-slate-200">關卡三：布林通道收斂突破</div>
+                    <div class="text-xs text-slate-400 mt-1">盤整期布林軌道縮口，隨後爆量突破，順勢追多或追空！獲利目標 +5%</div>
+                </button>
+                <button class="level-select-btn text-left p-3 rounded-xl border border-slate-700 hover:border-amber-500 bg-slate-800/50 hover:bg-slate-800 transition" data-level="4">
+                    <div class="font-bold text-sm text-slate-200">關卡四：無盡自由當沖 (SandBox)</div>
+                    <div class="text-xs text-slate-400 mt-1">隨機生成市場波動，考驗您的雙向操作與技術分析。</div>
+                </button>
+            </div>
+
+            <button id="btnCloseModal" class="mt-5 w-full py-2 bg-slate-800 text-slate-300 font-bold rounded-lg text-xs hover:bg-slate-700">關閉</button>
+        </div>
+    </div>
+
+    <!-- 遊戲結束/結算 Modal -->
+    <div id="resultModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl">
+            <div id="resultIcon" class="text-5xl mb-2">🎉</div>
+            <h3 id="resultTitle" class="text-xl font-black text-slate-100 mb-1">關卡挑戰成功！</h3>
+            <p id="resultDesc" class="text-xs text-slate-400 mb-4">您完美掌握了布林軌道與KD的搭配，當沖獲利入袋！</p>
+
+            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 mb-5 text-left text-xs font-mono space-y-1.5">
+                <div class="flex justify-between">
+                    <span class="text-slate-400">本次操作平倉損益:</span>
+                    <span id="resPnl" class="font-bold text-tw-up">+$35,000</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">報酬率 (ROI):</span>
+                    <span id="resRoi" class="font-bold text-tw-up">+3.5%</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">當沖勝率評價:</span>
+                    <span id="resRank" class="font-bold text-amber-400">S 級 (當沖股神)</span>
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <button id="btnRetry" class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition">重新挑戰</button>
+                <button id="btnNextLevel" class="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs transition">下一關</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 音效合成器 (Web Audio API)
+        class SoundFX {
+            constructor() { this.ctx = null; }
+            init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+            playTone(freq, type = 'sine', duration = 0.1, vol = 0.1) {
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(); osc.stop(this.ctx.currentTime + duration);
+                } catch(e) {}
+            }
+            short() { this.init(); this.playTone(400, 'sawtooth', 0.15, 0.12); }
+            cover() { this.init(); this.playTone(800, 'sine', 0.2, 0.15); }
+            win() { 
+                this.init(); 
+                this.playTone(523.25, 'triangle', 0.12, 0.2);
+                setTimeout(() => this.playTone(659.25, 'triangle', 0.12, 0.2), 100);
+                setTimeout(() => this.playTone(783.99, 'triangle', 0.25, 0.2), 200);
+            }
+        }
+        const audio = new SoundFX();
+
+        // 遊戲核心數據狀態
+        const state = {
+            cash: 1000000,
+            initialCapital: 1000000,
+            positionType: 'none', // 'long', 'short', 'none'
+            position: 0,          // 張數
+            avgPrice: 0,          // 持倉平均成本
+            realizedPnl: 0,
+            
+            // 股票行情與數據
+            stockPrice: 100.0,
+            basePrice: 100.0,
+            stockName: "2330 妖王科技",
+            candles: [],          // [{ open, high, low, close, volume, k, d, ma20, upper, lower }]
+            ticks: [],
+            currentTickInBar: 0,
+            ticksPerBar: 6,
+            
+            // 內外盤成交統計
+            innerVolume: 50,
+            outerVolume: 50,
+            selectedRatio: 0.1,
+            
+            // 遊戲運作
+            gameSpeed: 1,
+            timer: null,
+            currentLevel: 1,
+            levelGoalPct: 0.03,
+            levelDone: false,
+            
+            // 趨勢訊號
+            isKDDeathCross: false,
+            isKDGoldCount: false,
+            signalAlerted: false
+        };
+
+        // DOM 元素快取
+        const dom = {
+            totalAssets: document.getElementById('totalAssetsDisplay'),
+            pnl: document.getElementById('pnlDisplay'),
+            position: document.getElementById('positionDisplay'),
+            levelBadge: document.getElementById('levelBadge'),
+            stockName: document.getElementById('stockNameDisplay'),
+            stockPrice: document.getElementById('stockPriceDisplay'),
+            stockChange: document.getElementById('stockChangeDisplay'),
+            openPrice: document.getElementById('openPrice'),
+            highPrice: document.getElementById('highPrice'),
+            lowPrice: document.getElementById('lowPrice'),
+            totalVolume: document.getElementById('totalVolume'),
+            valK: document.getElementById('valK'),
+            valD: document.getElementById('valD'),
+            kingSpeech: document.getElementById('kingSpeech'),
+            currentTickPrice: document.getElementById('currentTickPrice'),
+            askContainer: document.getElementById('askContainer'),
+            bidContainer: document.getElementById('bidContainer'),
+            innerBar: document.getElementById('innerBar'),
+            outerBar: document.getElementById('outerBar'),
+            innerRatio: document.getElementById('innerRatio'),
+            outerRatio: document.getElementById('outerRatio'),
+            selectedQtyText: document.getElementById('selectedQtyText'),
+            btnBuy: document.getElementById('btnBuy'),
+            btnShort: document.getElementById('btnShort'),
+            btnCover: document.getElementById('btnCover'),
+            btnStopLoss: document.getElementById('btnStopLoss'),
+            signalBadge: document.getElementById('signalBadge'),
+            canvas: document.getElementById('chartCanvas')
+        };
+        const ctx = dom.canvas.getContext('2d');
+
+        function resizeCanvas() {
+            const rect = dom.canvas.parentElement.getBoundingClientRect();
+            dom.canvas.width = rect.width;
+            dom.canvas.height = rect.height;
+            renderChart();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // 9,3,3 KD 指標計算邏輯
+        function calculateKD(candles) {
+            const period = 9;
+            for (let i = 0; i < candles.length; i++) {
+                let startIdx = Math.max(0, i - period + 1);
+                let highestHigh = -Infinity, lowestLow = Infinity;
+                
+                for (let j = startIdx; j <= i; j++) {
+                    highestHigh = Math.max(highestHigh, candles[j].high);
+                    lowestLow = Math.min(lowestLow, candles[j].low);
+                }
+
+                let close = candles[i].close;
+                let rsv = (highestHigh === lowestLow) ? 50 : ((close - lowestLow) / (highestHigh - lowestLow)) * 100;
+                let prevK = (i > 0) ? candles[i - 1].k : 50;
+                let prevD = (i > 0) ? candles[i - 1].d : 50;
+                
+                candles[i].k = (2/3) * prevK + (1/3) * rsv;
+                candles[i].d = (2/3) * prevD + (1/3) * candles[i].k;
+            }
+        }
+
+        // 計算 MA 與 布林軌道 (Bollinger Bands)
+        // 參數設定: 20週期, 2倍標準差
+        function calculateBollingerBands(candles) {
+            const period = 20;
+            const multiplier = 2;
+
+            for (let i = 0; i < candles.length; i++) {
+                if (i < period - 1) {
+                    candles[i].ma20 = candles[i].close; // 預設值
+                    candles[i].upper = candles[i].close;
+                    candles[i].lower = candles[i].close;
+                    continue;
+                }
+
+                let sum = 0;
+                for (let j = i - period + 1; j <= i; j++) {
+                    sum += candles[j].close;
+                }
+                let ma = sum / period;
+                candles[i].ma20 = ma;
+
+                let varianceSum = 0;
+                for (let j = i - period + 1; j <= i; j++) {
+                    varianceSum += Math.pow(candles[j].close - ma, 2);
+                }
+                let variance = varianceSum / period;
+                let stdDev = Math.sqrt(variance);
+
+                candles[i].upper = ma + (multiplier * stdDev);
+                candles[i].lower = ma - (multiplier * stdDev);
+            }
+        }
+
+        // 初始化關卡數據歷史
+        function initLevelData(level) {
+            state.currentLevel = level;
+            state.candles = [];
+            state.positionType = 'none';
+            state.position = 0;
+            state.avgPrice = 0;
+            state.levelDone = false;
+            state.cash = state.initialCapital;
+            state.realizedPnl = 0;
+            state.innerVolume = 100;
+            state.outerVolume = 100;
+            state.signalAlerted = false;
+
+            dom.levelBadge.innerText = `關卡 ${level}`;
+
+            let baseP = 100.0;
+            if (level === 1) {
+                state.stockName = "2330 妖王科技 (上軌放空)";
+                state.levelGoalPct = 0.03;
+                baseP = 120.0;
+            } else if (level === 2) {
+                state.stockName = "3037 跌深電子 (下軌做多)";
+                state.levelGoalPct = 0.03;
+                baseP = 85.0;
+            } else if (level === 3) {
+                state.stockName = "6547 飆爆生技 (布林突破)";
+                state.levelGoalPct = 0.05;
+                baseP = 210.0;
+            } else {
+                state.stockName = "9999 自由當沖模式";
+                state.levelGoalPct = 0.10;
+                baseP = 150.0;
+            }
+
+            state.stockPrice = baseP;
+            state.basePrice = baseP;
+            dom.stockName.innerText = state.stockName;
+
+            // 預先生成 35 支歷史 K 線建立布林軌道
+            let currClose = baseP * 0.90;
+            for (let i = 0; i < 35; i++) {
+                let open = currClose;
+                let trend = (level===1 && i > 20) ? (Math.random() * 2 + 0.5) : 
+                            (level===2 && i > 20) ? -(Math.random() * 2 + 0.5) : (Math.random() * 1.5 - 0.7); 
+                let close = open + trend;
+                let high = Math.max(open, close) + Math.random() * 1.2;
+                let low = Math.min(open, close) - Math.random() * 1.0;
+                let vol = Math.floor(Math.random() * 300 + 100);
+
+                state.candles.push({ open, high, low, close, volume: vol, k: 50, d: 50, ma20: close, upper: close, lower: close });
+                currClose = close;
+            }
+
+            state.stockPrice = currClose;
+            calculateKD(state.candles);
+            calculateBollingerBands(state.candles);
+            updateHUD();
+            updateKingAdvice("關卡已展開，請觀察布林軌道邊緣與 KD 指標的配合！");
+        }
+
+        // 行情模擬引擎 (Market Tick Generator)
+        function nextTick() {
+            if (state.gameSpeed === 0 || state.levelDone) return;
+
+            let volatility = state.stockPrice * 0.004;
+            let bias = 0;
+
+            const lastK = state.candles[state.candles.length - 1]?.k || 50;
+            const lastD = state.candles[state.candles.length - 1]?.d || 50;
+            const lastUpper = state.candles[state.candles.length - 1]?.upper || state.stockPrice;
+            const lastLower = state.candles[state.candles.length - 1]?.lower || state.stockPrice;
+
+            // 根據不同關卡設定主力操盤 Bias
+            if (state.currentLevel === 1) {
+                // 觸頂回落
+                bias = (state.stockPrice >= lastUpper && lastK > 80) ? -volatility * 0.9 : (Math.random() - 0.45) * volatility;
+            } else if (state.currentLevel === 2) {
+                // 超賣反彈
+                bias = (state.stockPrice <= lastLower && lastK < 20) ? volatility * 0.9 : (Math.random() - 0.55) * volatility;
+            } else if (state.currentLevel === 3) {
+                // 突破
+                bias = (lastK > 70 && Math.random() > 0.7) ? volatility * 1.5 : (Math.random() - 0.5) * volatility;
+            } else {
+                bias = (Math.random() - 0.5) * volatility;
+            }
+
+            let delta = bias + (Math.random() - 0.5) * volatility;
+            state.stockPrice = Math.max(10.0, +(state.stockPrice + delta).toFixed(1));
+
+            // 更新成交內外盤統計
+            if (delta <= 0) state.innerVolume += Math.floor(Math.random() * 20 + 5);
+            else state.outerVolume += Math.floor(Math.random() * 20 + 5);
+
+            let currentBar = state.candles[state.candles.length - 1];
+            state.currentTickInBar++;
+
+            if (state.currentTickInBar >= state.ticksPerBar) {
+                state.currentTickInBar = 0;
+                let open = state.stockPrice;
+                state.candles.push({
+                    open: open,
+                    high: open,
+                    low: open,
+                    close: open,
+                    volume: Math.floor(Math.random() * 200 + 50),
+                    k: 50,
+                    d: 50,
+                    ma20: open,
+                    upper: open,
+                    lower: open
+                });
+                if (state.candles.length > 50) state.candles.shift(); // 保持畫面乾淨
+            } else {
+                currentBar.close = state.stockPrice;
+                currentBar.high = Math.max(currentBar.high, state.stockPrice);
+                currentBar.low = Math.min(currentBar.low, state.stockPrice);
+                currentBar.volume += Math.floor(Math.random() * 15 + 1);
+            }
+
+            calculateKD(state.candles);
+            calculateBollingerBands(state.candles);
+            checkTradeSignals();
+            updateOrderBook();
+            updateHUD();
+            renderChart();
+        }
+
+        // 檢查交易訊號 (KD 死叉/金叉 + 布林軌道)
+        function checkTradeSignals() {
+            if (state.candles.length < 2) return;
+            const curr = state.candles[state.candles.length - 1];
+            const prev = state.candles[state.candles.length - 2];
+
+            state.isKDDeathCross = false;
+            state.isKDGoldCount = false;
+            dom.signalBadge.classList.add('hidden');
+
+            // 判斷高檔死叉 (配合布林上軌附近)
+            if (prev.k > 75 && prev.k >= prev.d && curr.k < curr.d && curr.close >= curr.ma20) {
+                state.isKDDeathCross = true;
+                dom.signalBadge.classList.remove('hidden');
+                dom.signalBadge.className = "absolute top-4 left-4 bg-emerald-600/90 text-white font-bold text-xs px-3 py-1.5 rounded-full border border-emerald-400 shadow-lg shadow-emerald-500/50 animate-pulse-fast";
+                dom.signalBadge.innerText = "⚡ KD高檔死叉 + 觸碰上軌，放空時機！";
+
+                if (!state.signalAlerted) {
+                    audio.playTone(900, 'sine', 0.1, 0.2);
+                    updateKingAdvice("⚡【空方訊號】碰到布林上軌且 KD 死叉，這波容易拉回，準備放空！");
+                    state.signalAlerted = true;
+                }
+            } 
+            // 判斷低檔金叉 (配合布林下軌附近)
+            else if (prev.k < 25 && prev.k <= prev.d && curr.k > curr.d && curr.close <= curr.ma20) {
+                state.isKDGoldCount = true;
+                dom.signalBadge.classList.remove('hidden');
+                dom.signalBadge.className = "absolute top-4 left-4 bg-red-600/90 text-white font-bold text-xs px-3 py-1.5 rounded-full border border-red-400 shadow-lg shadow-red-500/50 animate-pulse-fast";
+                dom.signalBadge.innerText = "🔥 KD低檔金叉 + 觸碰下軌，做多時機！";
+
+                if (!state.signalAlerted) {
+                    audio.playTone(600, 'sine', 0.1, 0.2);
+                    updateKingAdvice("🔥【多方訊號】跌到布林下軌且 KD 金叉，支撐強勁，準備搶反彈做多！");
+                    state.signalAlerted = true;
+                }
+            } else {
+                state.signalAlerted = false;
+            }
+        }
+
+        // 更新微觀五檔報價 (Level 2 Order Book)
+        function updateOrderBook() {
+            const p = state.stockPrice;
+            const step = 0.5;
+
+            dom.askContainer.innerHTML = '';
+            dom.bidContainer.innerHTML = '';
+
+            for (let i = 5; i >= 1; i--) {
+                let askP = +(p + i * step).toFixed(1);
+                let qty = Math.floor(Math.random() * 80 + 10);
+                
+                if (state.isKDDeathCross && (i === 3 || i === 4)) {
+                    qty += Math.floor(Math.random() * 300 + 200); // 空方壓單
+                }
+
+                dom.askContainer.appendChild(createOrderRow(`賣${['', '一', '二', '三', '四', '五'][i]}`, askP, qty, 'down'));
+            }
+
+            dom.currentTickPrice.innerText = p.toFixed(1);
+
+            for (let i = 1; i <= 5; i++) {
+                let bidP = +(p - i * step).toFixed(1);
+                let qty = Math.floor(Math.random() * 80 + 10);
+
+                if (state.isKDGoldCount && (i === 2 || i === 3)) {
+                    qty += Math.floor(Math.random() * 300 + 200); // 多方托單
+                } else if (state.isKDDeathCross && i <= 3) {
+                    qty = Math.max(3, Math.floor(qty * 0.2)); // 空頭買盤縮手
+                }
+
+                dom.bidContainer.appendChild(createOrderRow(`買${['', '一', '二', '三', '四', '五'][i]}`, bidP, qty, 'up'));
+            }
+
+            const totalVol = state.innerVolume + state.outerVolume;
+            const innerPct = totalVol === 0 ? 50 : Math.round((state.innerVolume / totalVol) * 100);
+            const outerPct = 100 - innerPct;
+
+            dom.innerBar.style.width = `${innerPct}%`;
+            dom.outerBar.style.width = `${outerPct}%`;
+            dom.innerRatio.innerText = `${innerPct}%`;
+            dom.outerRatio.innerText = `${outerPct}%`;
+        }
+
+        function createOrderRow(label, price, qty, type) {
+            const row = document.createElement('div');
+            row.className = 'grid grid-cols-12 items-center py-0.5 px-1 rounded hover:bg-slate-800/50 text-xs font-mono';
+            const priceClass = type === 'up' ? 'text-tw-up' : 'text-tw-down';
+            const barBg = type === 'up' ? 'bg-red-500/50' : 'bg-green-500/50';
+            const maxVal = 400;
+            const barPct = Math.min(100, Math.round((qty / maxVal) * 100));
+
+            row.innerHTML = `
+                <span class="col-span-3 text-slate-400 font-sans text-[11px]">${label}</span>
+                <span class="col-span-4 font-bold ${priceClass}">${price.toFixed(1)}</span>
+                <span class="col-span-3 text-right text-slate-200 ${qty > 200 ? 'text-amber-400 font-bold' : ''}">${qty}</span>
+                <div class="col-span-2 pl-1.5">
+                    <div class="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                        <div class="h-full ${barBg}" style="width: ${barPct}%;"></div>
+                    </div>
+                </div>
+            `;
+            return row;
+        }
+
+        function renderChart() {
+            const w = dom.canvas.width;
+            const h = dom.canvas.height;
+            if (w === 0 || h === 0) return;
+
+            ctx.clearRect(0, 0, w, h);
+
+            const candleRegionHeight = h * 0.65;
+            const kdRegionTop = h * 0.70;
+            const kdRegionHeight = h * 0.30;
+
+            const candles = state.candles;
+            if (candles.length === 0) return;
+
+            // 計算最高最低價 (包含布林軌道範圍)
+            let minP = Infinity, maxP = -Infinity;
+            candles.forEach(c => {
+                minP = Math.min(minP, c.low, c.lower);
+                maxP = Math.max(maxP, c.high, c.upper);
+            });
+            let pRange = (maxP - minP) || 1;
+            minP -= pRange * 0.05;
+            maxP += pRange * 0.05;
+            pRange = maxP - minP;
+
+            const paddingLeft = 10;
+            const paddingRight = 50;
+            const chartW = w - paddingLeft - paddingRight;
+            const candleW = Math.max(2, chartW / candles.length);
+            
+            let getY = (price) => candleRegionHeight - ((price - minP) / pRange) * candleRegionHeight;
+
+            // 1. 繪製背景網格格線
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1;
+            for (let i = 1; i <= 4; i++) {
+                let y = (candleRegionHeight / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+                ctx.stroke();
+            }
+
+            // 1.5 繪製布林軌道 (Bollinger Bands)
+            ctx.lineWidth = 1;
+            
+            // 繪製軌道區間背景色
+            ctx.fillStyle = 'rgba(56, 189, 248, 0.05)'; // 淺藍色半透明
+            ctx.beginPath();
+            candles.forEach((c, i) => {
+                let x = paddingLeft + i * candleW + candleW / 2;
+                let y = getY(c.upper);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            for(let i = candles.length - 1; i >= 0; i--) {
+                let c = candles[i];
+                let x = paddingLeft + i * candleW + candleW / 2;
+                let y = getY(c.lower);
+                ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.fill();
+
+            // 上軌
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+            ctx.beginPath();
+            candles.forEach((c, i) => {
+                let x = paddingLeft + i * candleW + candleW / 2;
+                if (i === 0) ctx.moveTo(x, getY(c.upper));
+                else ctx.lineTo(x, getY(c.upper));
+            });
+            ctx.stroke();
+
+            // 下軌
+            ctx.beginPath();
+            candles.forEach((c, i) => {
+                let x = paddingLeft + i * candleW + candleW / 2;
+                if (i === 0) ctx.moveTo(x, getY(c.lower));
+                else ctx.lineTo(x, getY(c.lower));
+            });
+            ctx.stroke();
+
+            // 中軌 (MA20)
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.8)'; // slate-400
+            ctx.setLineDash([2, 2]);
+            ctx.beginPath();
+            candles.forEach((c, i) => {
+                let x = paddingLeft + i * candleW + candleW / 2;
+                if (i === 0) ctx.moveTo(x, getY(c.ma20));
+                else ctx.lineTo(x, getY(c.ma20));
+            });
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 2. 繪製 K 線 (台股顏色: 漲=紅, 跌=綠)
+            candles.forEach((c, i) => {
+                let x = paddingLeft + i * candleW + candleW / 2;
+                let openY = getY(c.open);
+                let closeY = getY(c.close);
+                let highY = getY(c.high);
+                let lowY = getY(c.low);
+
+                let isUp = c.close >= c.open;
+                let color = isUp ? '#ef4444' : '#22c55e'; // 台股規範: 紅漲跌綠
+
+                // 畫影線
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(x, highY);
+                ctx.lineTo(x, lowY);
+                ctx.stroke();
+
+                // 畫實體棒
+                let barTop = Math.min(openY, closeY);
+                let barH = Math.max(2, Math.abs(closeY - openY));
+                ctx.fillStyle = color;
+                ctx.fillRect(x - candleW * 0.35, barTop, candleW * 0.7, barH);
+            });
+
+            // 3. 繪製持倉成本線
+            if (state.position > 0) {
+                let entryY = getY(state.avgPrice);
+                let posColor = state.positionType === 'long' ? '#ef4444' : '#22c55e'; // 多單紅線，空單綠線
+                let labelText = state.positionType === 'long' ? '多單' : '空單';
+
+                ctx.strokeStyle = posColor;
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(0, entryY);
+                ctx.lineTo(w - paddingRight, entryY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // 標示文字
+                ctx.fillStyle = posColor;
+                ctx.font = 'bold 11px sans-serif';
+                ctx.fillText(`${labelText}成本 $${state.avgPrice.toFixed(1)}`, w - 100, entryY - 4);
+            }
+
+            // 4. KD 指標副圖區域繪製
+            let getKdY = (val) => kdRegionTop + kdRegionHeight - (val / 100) * kdRegionHeight;
+
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([2, 2]);
+
+            // 80 / 20 警戒線
+            ctx.beginPath();
+            ctx.moveTo(0, getKdY(80)); ctx.lineTo(w, getKdY(80));
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(0, getKdY(20)); ctx.lineTo(w, getKdY(20));
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = '#64748b';
+            ctx.font = '10px monospace';
+            ctx.fillText('80', w - 20, getKdY(80) + 3);
+            ctx.fillText('20', w - 20, getKdY(20) + 3);
+
+            // 畫 K/D 曲線
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = '#f87171'; // K 線 (粉紅)
+            ctx.beginPath();
+            candles.forEach((c, i) => {
+                let x = paddingLeft + i * candleW + candleW / 2;
+                let y = getKdY(c.k);
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            ctx.strokeStyle = '#facc15'; // D 線 (黃)
+            ctx.beginPath();
+            candles.forEach((c, i) => {
+                let x = paddingLeft + i * candleW + candleW / 2;
+                let y = getKdY(c.d);
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            const latestC = candles[candles.length - 1];
+            dom.valK.innerText = latestC.k.toFixed(1);
+            dom.valD.innerText = latestC.d.toFixed(1);
+        }
+
+        function updateHUD() {
+            const p = state.stockPrice;
+            const diff = +(p - state.basePrice).toFixed(1);
+            const pct = ((diff / state.basePrice) * 100).toFixed(2);
+
+            dom.stockPrice.innerText = p.toFixed(1);
+            dom.stockPrice.className = `font-mono text-2xl font-black ${diff >= 0 ? 'text-tw-up' : 'text-tw-down'}`;
+            dom.stockChange.innerText = `${diff >= 0 ? '+' : ''}${diff} (${pct}%)`;
+            dom.stockChange.className = `font-mono text-sm font-bold ${diff >= 0 ? 'text-tw-up' : 'text-tw-down'}`;
+
+            let high = -Infinity, low = Infinity;
+            state.candles.forEach(c => {
+                high = Math.max(high, c.high);
+                low = Math.min(low, c.low);
+            });
+            dom.openPrice.innerText = state.candles[0]?.open.toFixed(1) || p.toFixed(1);
+            dom.highPrice.innerText = high.toFixed(1);
+            dom.lowPrice.innerText = low.toFixed(1);
+
+            let totalVol = state.candles.reduce((acc, c) => acc + c.volume, 0);
+            dom.totalVolume.innerText = `${totalVol.toLocaleString()} 張`;
+
+            // 計算未實現損益
+            let unrealizedPnl = 0;
+            if (state.position > 0) {
+                if (state.positionType === 'long') {
+                    unrealizedPnl = (p - state.avgPrice) * state.position * 1000;
+                } else if (state.positionType === 'short') {
+                    unrealizedPnl = (state.avgPrice - p) * state.position * 1000;
+                }
+            }
+
+            let currentTotalAssets = state.cash + unrealizedPnl;
+            dom.totalAssets.innerText = `$${Math.round(currentTotalAssets).toLocaleString()}`;
+            
+            // 更新部位顯示
+            if (state.position === 0) {
+                dom.position.innerText = `無部位`;
+                dom.position.className = `font-mono font-bold text-base text-slate-300`;
+            } else {
+                let typeText = state.positionType === 'long' ? '多' : '空';
+                let typeColor = state.positionType === 'long' ? 'text-tw-up' : 'text-tw-down';
+                dom.position.innerText = `${typeText} ${state.position} 張`;
+                dom.position.className = `font-mono font-bold text-base ${typeColor}`;
+            }
+
+            let pnlPct = state.position > 0 ? ((unrealizedPnl / (state.avgPrice * state.position * 1000)) * 100).toFixed(2) : '0.00';
+            dom.pnl.innerText = `$${Math.round(unrealizedPnl).toLocaleString()} (${pnlPct}%)`;
+            dom.pnl.className = `font-mono font-bold text-base ${unrealizedPnl >= 0 ? 'text-tw-up' : 'text-tw-down'}`;
+
+            // 控制按鈕可使用狀態 (限制只能單向持倉)
+            dom.btnCover.disabled = (state.position === 0);
+            dom.btnBuy.disabled = (state.positionType === 'short');
+            dom.btnShort.disabled = (state.positionType === 'long');
+
+            // 更新預計可下單張數
+            let maxCanBuy = Math.floor((state.cash * state.selectedRatio) / (p * 1000));
+            maxCanBuy = Math.max(1, maxCanBuy);
+            dom.selectedQtyText.innerText = `${maxCanBuy} 張`;
+
+            if (!state.levelDone && state.position > 0) {
+                let roi = unrealizedPnl / state.initialCapital;
+                if (roi >= state.levelGoalPct) triggerWinLevel(unrealizedPnl, roi);
+            }
+        }
+
+        function updateKingAdvice(msg) {
+            dom.kingSpeech.innerText = `「${msg}」`;
+        }
+
+        // 交易動作：買進 (做多)
+        function executeBuyLong() {
+            if (state.positionType === 'short') return; // 防呆
+
+            const p = state.stockPrice;
+            let qtyToBuy = Math.floor((state.cash * state.selectedRatio) / (p * 1000));
+            qtyToBuy = Math.max(1, qtyToBuy);
+
+            let cost = p * qtyToBuy * 1000;
+            if (state.cash < cost) {
+                updateKingAdvice("資金不足！無法買進更多。");
+                return;
+            }
+
+            // 加權平均計算成本
+            let totalShares = state.position + qtyToBuy;
+            state.avgPrice = ((state.avgPrice * state.position) + (p * qtyToBuy)) / totalShares;
+            state.position = totalShares;
+            state.positionType = 'long';
+            state.cash -= cost; 
+
+            audio.cover(); // 借用音效
+            updateKingAdvice(`已於 $${p.toFixed(1)} 成功買進做多 ${qtyToBuy} 張！期待向上噴發！`);
+            updateHUD();
+        }
+
+        // 交易動作：融券賣出 (放空)
+        function executeShortSell() {
+            if (state.positionType === 'long') return; // 防呆
+
+            const p = state.stockPrice;
+            let qtyToShort = Math.floor((state.cash * state.selectedRatio) / (p * 1000));
+            qtyToShort = Math.max(1, qtyToShort);
+
+            let requiredMargin = p * qtyToShort * 1000;
+            if (state.cash < requiredMargin) {
+                updateKingAdvice("保證金不足！無法建立更多空單。");
+                return;
+            }
+
+            // 加權平均計算成本
+            let totalShares = state.position + qtyToShort;
+            state.avgPrice = ((state.avgPrice * state.position) + (p * qtyToShort)) / totalShares;
+            state.position = totalShares;
+            state.positionType = 'short';
+            state.cash -= requiredMargin * 0.9; // 假設定價融券保證金 90%
+
+            audio.short();
+            updateKingAdvice(`已於 $${p.toFixed(1)} 成功融券放空 ${qtyToShort} 張！坐等股價崩盤！`);
+            updateHUD();
+        }
+
+        // 交易動作：平倉 (Cover/Sell)
+        function executeCover() {
+            if (state.position === 0) return;
+
+            const p = state.stockPrice;
+            let pnl = 0;
+            
+            if (state.positionType === 'long') {
+                pnl = (p - state.avgPrice) * state.position * 1000;
+                state.cash += (state.avgPrice * state.position * 1000) + pnl; // 取回本金+獲利
+            } else if (state.positionType === 'short') {
+                pnl = (state.avgPrice - p) * state.position * 1000;
+                state.cash += (state.avgPrice * state.position * 1000 * 0.9) + pnl; // 取回保證金+獲利
+            }
+
+            state.realizedPnl += pnl;
+            audio.cover();
+
+            if (pnl >= 0) {
+                updateKingAdvice(`完美落袋為安！成功於 $${p.toFixed(1)} 平倉，落袋獲利 $${Math.round(pnl).toLocaleString()}！`);
+            } else {
+                updateKingAdvice(`果斷停損！於 $${p.toFixed(1)} 平倉，損失 $${Math.round(Math.abs(pnl)).toLocaleString()}。留得青山在！`);
+            }
+
+            state.position = 0;
+            state.positionType = 'none';
+            state.avgPrice = 0;
+            updateHUD();
+        }
+
+        // 觸發關卡勝利 Modal
+        function triggerWinLevel(pnl, roi) {
+            state.levelDone = true;
+            audio.win();
+
+            document.getElementById('resultIcon').innerText = "🏆";
+            document.getElementById('resultTitle').innerText = `關卡 ${state.currentLevel} 挑戰成功！`;
+            document.getElementById('resultDesc').innerText = `精準掌握當沖轉折，獲利入袋！`;
+            document.getElementById('resPnl').innerText = `+$${Math.round(pnl).toLocaleString()}`;
+            document.getElementById('resRoi').innerText = `+${(roi * 100).toFixed(2)}%`;
+            document.getElementById('resRank').innerText = "S 級 (當沖股神)";
+
+            document.getElementById('resultModal').classList.remove('hidden');
+        }
+
+        function setupEventListeners() {
+            document.querySelectorAll('.pos-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.pos-btn').forEach(b => b.classList.replace('bg-amber-500', 'bg-slate-800'));
+                    e.target.classList.replace('bg-slate-800', 'bg-amber-500');
+                    state.selectedRatio = parseFloat(e.target.dataset.pct);
+                    updateHUD();
+                });
+            });
+
+            // 交易按鈕
+            dom.btnBuy.addEventListener('click', executeBuyLong);
+            dom.btnShort.addEventListener('click', executeShortSell);
+            dom.btnCover.addEventListener('click', executeCover);
+            dom.btnStopLoss.addEventListener('click', () => {
+                if (state.position > 0) executeCover();
+            });
+
+            // 遊戲速度控制器
+            document.getElementById('btnPause').addEventListener('click', () => { state.gameSpeed = 0; });
+            document.getElementById('btnSpeed1').addEventListener('click', () => { state.gameSpeed = 1; });
+            document.getElementById('btnSpeed2').addEventListener('click', () => { state.gameSpeed = 2; });
+            document.getElementById('btnSpeed5').addEventListener('click', () => { state.gameSpeed = 5; });
+
+            // 關卡切換 Modal
+            document.getElementById('btnSelectLevel').addEventListener('click', () => {
+                document.getElementById('levelModal').classList.remove('hidden');
+            });
+            document.getElementById('btnCloseModal').addEventListener('click', () => {
+                document.getElementById('levelModal').classList.add('hidden');
+            });
+
+            document.querySelectorAll('.level-select-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    let lvl = parseInt(e.currentTarget.dataset.level);
+                    initLevelData(lvl);
+                    document.getElementById('levelModal').classList.add('hidden');
+                });
+            });
+
+            // 結算 Modal 按鈕
+            document.getElementById('btnRetry').addEventListener('click', () => {
+                document.getElementById('resultModal').classList.add('hidden');
+                initLevelData(state.currentLevel);
+            });
+            document.getElementById('btnNextLevel').addEventListener('click', () => {
+                document.getElementById('resultModal').classList.add('hidden');
+                let next = Math.min(4, state.currentLevel + 1);
+                initLevelData(next);
+            });
+        }
+
+        function initGame() {
+            setupEventListeners();
+            initLevelData(1);
+            resizeCanvas();
+            setInterval(() => { nextTick(); }, 300);
+        }
+
+        window.onload = initGame;
+    </script>
+</body>
+</html>
