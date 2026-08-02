@@ -999,10 +999,10 @@
             });
 
             // 遊戲速度控制器
-            document.getElementById('btnPause').addEventListener('click', () => { state.gameSpeed = 0; });
-            document.getElementById('btnSpeed1').addEventListener('click', () => { state.gameSpeed = 1; });
-            document.getElementById('btnSpeed2').addEventListener('click', () => { state.gameSpeed = 2; });
-            document.getElementById('btnSpeed5').addEventListener('click', () => { state.gameSpeed = 5; });
+            document.getElementById('btnPause').addEventListener('click', () => changeSpeed(0, 'btnPause'));
+            document.getElementById('btnSpeed1').addEventListener('click', () => changeSpeed(1, 'btnSpeed1'));
+            document.getElementById('btnSpeed2').addEventListener('click', () => changeSpeed(2, 'btnSpeed2'));
+            document.getElementById('btnSpeed5').addEventListener('click', () => changeSpeed(5, 'btnSpeed5'));
 
             // 關卡切換 Modal
             document.getElementById('btnSelectLevel').addEventListener('click', () => {
@@ -1024,19 +1024,42 @@
             document.getElementById('btnRetry').addEventListener('click', () => {
                 document.getElementById('resultModal').classList.add('hidden');
                 initLevelData(state.currentLevel);
+                changeSpeed(1, 'btnSpeed1'); // 過關重啟恢復 1x
             });
             document.getElementById('btnNextLevel').addEventListener('click', () => {
                 document.getElementById('resultModal').classList.add('hidden');
                 let next = Math.min(4, state.currentLevel + 1);
                 initLevelData(next);
+                changeSpeed(1, 'btnSpeed1'); // 過關重啟恢復 1x
             });
+        }
+
+        // 切換遊戲速度邏輯
+        function changeSpeed(speed, btnId) {
+            state.gameSpeed = speed;
+            
+            // 更新按鈕 UI 顏色狀態
+            ['btnPause', 'btnSpeed1', 'btnSpeed2', 'btnSpeed5'].forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.remove('bg-amber-500', 'text-slate-950');
+                if (!el.classList.contains('bg-slate-800')) el.classList.add('bg-slate-800');
+            });
+            const activeEl = document.getElementById(btnId);
+            activeEl.classList.remove('bg-slate-800');
+            activeEl.classList.add('bg-amber-500', 'text-slate-950'); // 套用黃金高亮顏色
+
+            // 重設計時器來改變 Tick 的頻率 (1x = 300ms, 2x = 150ms, 5x = 60ms)
+            if (state.timer) clearInterval(state.timer);
+            if (speed > 0) {
+                state.timer = setInterval(() => { nextTick(); }, 300 / speed);
+            }
         }
 
         function initGame() {
             setupEventListeners();
             initLevelData(1);
             resizeCanvas();
-            setInterval(() => { nextTick(); }, 300);
+            changeSpeed(1, 'btnSpeed1'); // 初始化時啟動遊戲迴圈 (1倍速)
         }
 
         window.onload = initGame;
