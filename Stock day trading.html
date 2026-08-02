@@ -323,6 +323,8 @@
             ticks: [],
             currentTickInBar: 0,
             ticksPerBar: 6,
+            tickCount: 0,
+            marketCycle: 0,
             
             // 內外盤成交統計
             innerVolume: 50,
@@ -447,6 +449,8 @@
             state.innerVolume = 100;
             state.outerVolume = 100;
             state.signalAlerted = false;
+            state.tickCount = 0;
+            state.marketCycle = Math.random() * Math.PI * 2; // 隨機震盪起始點
 
             dom.levelBadge.innerText = `關卡 ${level}`;
 
@@ -514,33 +518,47 @@
         function nextTick() {
             if (state.gameSpeed === 0 || state.levelDone) return;
 
+            state.tickCount++;
+            state.marketCycle += 0.15; // 產生波段震盪週期 (大約每 7 根 K 線一個完整高低循環)
+
             let volatility = state.stockPrice * 0.004;
             let bias = 0;
+            let wave = Math.sin(state.marketCycle) * volatility * 0.9; // 基礎高低震盪波浪
 
             const lastC = state.candles[state.candles.length - 1];
             const lastK = lastC?.k || 50;
 
-            // 根據關卡設定主力操盤 Bias
+            // 根據關卡設定主力操盤 Bias (疊加上下震盪波浪)
             if (state.currentLevel === 1) {
-                bias = (lastC.close > lastC.upper && lastK > 80) ? -volatility * 1.2 : (Math.random() - 0.45) * volatility;
+                // 觸頂回落：整體緩漲帶震盪，觸碰到上軌且KD高檔時重挫
+                bias = (lastC.close > lastC.upper && lastK > 80) ? -volatility * 1.5 : wave + volatility * 0.15;
             } else if (state.currentLevel === 2) {
-                bias = (lastC.close < lastC.lower && lastK < 20) ? volatility * 1.2 : (Math.random() - 0.55) * volatility;
+                // 超賣反彈：整體緩跌帶震盪，觸碰到下軌且KD低檔時急拉
+                bias = (lastC.close < lastC.lower && lastK < 20) ? volatility * 1.5 : wave - volatility * 0.15;
             } else if (state.currentLevel === 3) {
-                bias = (Math.random() > 0.8) ? (Math.random() - 0.5) * volatility * 3 : (Math.random() - 0.5) * volatility * 0.5;
-            } else if (state.currentLevel === 4) { // 假突破真殺盤
-                bias = (lastC.close > lastC.upper) ? -volatility * 1.8 : volatility * 0.55; 
-            } else if (state.currentLevel === 5) { // 階梯緩跌
-                bias = -volatility * 0.35; 
-            } else if (state.currentLevel === 6) { // 強勢軋空
-                bias = volatility * 0.4; 
-            } else if (state.currentLevel === 7) { // 震盪死魚盤
-                volatility = state.stockPrice * 0.0015; // 降低波動率
-                bias = (state.stockPrice > state.basePrice) ? -volatility * 0.5 : volatility * 0.5; // 均值回歸
+                // 軌道突破：盤整一段時間後爆發
+                bias = (state.tickCount > 60) ? (volatility * 1.2 + wave * 0.5) : (wave * 0.4);
+            } else if (state.currentLevel === 4) { 
+                // 假突破真殺盤：前 40 tick 帶震盪創高，之後觸上軌直接大單倒貨
+                bias = (state.tickCount > 40 && lastC.close > lastC.upper) ? -volatility * 2.0 : wave + volatility * 0.3; 
+            } else if (state.currentLevel === 5) { 
+                // 階梯緩跌：反彈波與殺盤波交替，但高點不過前高，低點越來越低
+                bias = wave * 1.2 - volatility * 0.25; 
+            } else if (state.currentLevel === 6) { 
+                // 強勢軋空：回檔波與衝刺波交替，低點不破前低，一路向上
+                bias = wave * 1.2 + volatility * 0.25; 
+            } else if (state.currentLevel === 7) { 
+                // 震盪死魚盤：強烈均值回歸，在平盤上下來回游走
+                volatility = state.stockPrice * 0.002; 
+                bias = wave * 0.5 + (state.basePrice - state.stockPrice) * 0.1; 
             } else {
-                bias = (Math.random() - 0.52) * volatility;
+                // 自由模式：隨機切換多空波段
+                let trend = Math.sin(state.tickCount / 100) * volatility * 0.5;
+                bias = wave + trend;
             }
 
-            let delta = bias + (Math.random() - 0.5) * volatility;
+            // 最終價格變化 = 主力趨勢(包含波浪) + 隨機微小雜訊
+            let delta = bias + (Math.random() - 0.5) * volatility * 0.6; 
             state.stockPrice = Math.max(10.0, +(state.stockPrice + delta).toFixed(1));
 
             // 更新成交內外盤統計
