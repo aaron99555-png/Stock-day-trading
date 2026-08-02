@@ -366,7 +366,241 @@
         }
         window.addEventListener('resize', resizeCanvas);
 
-        // ... (保持原本的計算與其他函數不變)
+        // 9,3,3 KD 指標計算邏輯
+        function calculateKD(candles) {
+            const period = 9;
+            for (let i = 0; i < candles.length; i++) {
+                let startIdx = Math.max(0, i - period + 1);
+                let highestHigh = -Infinity;
+                let lowestLow = Infinity;
+                
+                for (let j = startIdx; j <= i; j++) {
+                    highestHigh = Math.max(highestHigh, candles[j].high);
+                    lowestLow = Math.min(lowestLow, candles[j].low);
+                }
+
+                let close = candles[i].close;
+                let rsv = (highestHigh === lowestLow) ? 50 : ((close - lowestLow) / (highestHigh - lowestLow)) * 100;
+                
+                let prevK = (i > 0) ? candles[i - 1].k : 50;
+                let prevD = (i > 0) ? candles[i - 1].d : 50;
+                
+                candles[i].k = (2/3) * prevK + (1/3) * rsv;
+                candles[i].d = (2/3) * prevD + (1/3) * candles[i].k;
+            }
+        }
+
+        // 20MA 布林軌道計算邏輯
+        function calculateBollingerBands(candles) {
+            const period = 20;
+            const multiplier = 2;
+            for (let i = 0; i < candles.length; i++) {
+                if (i < period - 1) {
+                    candles[i].ma20 = candles[i].close;
+                    candles[i].upper = candles[i].close;
+                    candles[i].lower = candles[i].close;
+                    continue;
+                }
+                let sum = 0;
+                for (let j = i - period + 1; j <= i; j++) {
+                    sum += candles[j].close;
+                }
+                let ma20 = sum / period;
+                let variance = 0;
+                for (let j = i - period + 1; j <= i; j++) {
+                    variance += Math.pow(candles[j].close - ma20, 2);
+                }
+                let stdDev = Math.sqrt(variance / period);
+                candles[i].ma20 = ma20;
+                candles[i].upper = ma20 + multiplier * stdDev;
+                candles[i].lower = ma20 - multiplier * stdDev;
+            }
+        }
+
+        // 初始化關卡數據
+        function initLevelData(level) {
+            state.currentLevel = level;
+            state.candles = [];
+            state.position = 0;
+            state.positionType = 'none';
+            state.avgPrice = 0;
+            state.levelDone = false;
+            state.cash = state.initialCapital;
+            state.realizedPnl = 0;
+            state.innerVolume = 100;
+            state.outerVolume = 100;
+            state.signalAlerted = false;
+
+            dom.levelBadge.innerText = `關卡 ${level}`;
+
+            let baseP = 100.0;
+            if (level === 1) {
+                state.stockName = "2330 妖王科技 (觸頂回落)";
+                state.levelGoalPct = 0.03;
+                baseP = 120.0;
+            } else if (level === 2) {
+                state.stockName = "3037 誘多電子 (超賣反彈)";
+                state.levelGoalPct = 0.03;
+                baseP = 85.0;
+            } else if (level === 3) {
+                state.stockName = "6547 飆爆生技 (軌道突破)";
+                state.levelGoalPct = 0.05;
+                baseP = 210.0;
+            } else {
+                state.stockName = "9999 自由市場模式";
+                state.levelGoalPct = 0.10;
+                baseP = 150.0;
+            }
+
+            state.stockPrice = baseP;
+            state.basePrice = baseP;
+            dom.stockName.innerText = state.stockName;
+
+            // 預先生成歷史 K 線以繪製圖表
+            let currClose = baseP * 0.85;
+            for (let i = 0; i < 35; i++) {
+                let open = currClose;
+                let trend = (i < 25) ? (Math.random() * 2 + 0.5) : (Math.random() * 1.5 - 0.2); 
+                let close = open + trend;
+                let high = Math.max(open, close) + Math.random() * 1.2;
+                let low = Math.min(open, close) - Math.random() * 1.0;
+                let vol = Math.floor(Math.random() * 300 + 100);
+
+                state.candles.push({ open, high, low, close, volume: vol, k: 50, d: 50, ma20: close, upper: close, lower: close });
+                currClose = close;
+            }
+
+            state.stockPrice = currClose;
+            calculateKD(state.candles);
+            calculateBollingerBands(state.candles);
+            updateHUD();
+            updateKingAdvice("關卡已展開，請觀察布林軌道邊界與 KD 指標，尋找絕佳的進場點！");
+        }
+
+        // 行情模擬引擎 (每跳動一次 Tick)
+        function nextTick() {
+            if (state.gameSpeed === 0 || state.levelDone) return;
+
+            let volatility = state.stockPrice * 0.004;
+            let bias = 0;
+
+            const lastC = state.candles[state.candles.length - 1];
+            const lastK = lastC?.k || 50;
+
+            // 根據關卡設定主力操盤 Bias
+            if (state.currentLevel === 1) {
+                bias = (lastC.close > lastC.upper && lastK > 80) ? -volatility * 1.2 : (Math.random() - 0.45) * volatility;
+            } else if (state.currentLevel === 2) {
+                bias = (lastC.close < lastC.lower && lastK < 20) ? volatility * 1.2 : (Math.random() - 0.55) * volatility;
+            } else if (state.currentLevel === 3) {
+                bias = (Math.random() > 0.8) ? (Math.random() - 0.5) * volatility * 3 : (Math.random() - 0.5) * volatility * 0.5;
+            } else {
+                bias = (Math.random() - 0.52) * volatility;
+            }
+
+            let delta = bias + (Math.random() - 0.5) * volatility;
+            state.stockPrice = Math.max(10.0, +(state.stockPrice + delta).toFixed(1));
+
+            // 更新成交內外盤統計
+            if (delta <= 0) state.innerVolume += Math.floor(Math.random() * 20 + 5);
+            else state.outerVolume += Math.floor(Math.random() * 20 + 5);
+
+            // 更新當前 K 線 Bar
+            let currentBar = state.candles[state.candles.length - 1];
+            state.currentTickInBar++;
+
+            if (state.currentTickInBar >= state.ticksPerBar) {
+                state.currentTickInBar = 0;
+                let open = state.stockPrice;
+                state.candles.push({
+                    open: open, high: open, low: open, close: open,
+                    volume: Math.floor(Math.random() * 200 + 50),
+                    k: 50, d: 50, ma20: open, upper: open, lower: open
+                });
+                if (state.candles.length > 50) state.candles.shift();
+            } else {
+                currentBar.close = state.stockPrice;
+                currentBar.high = Math.max(currentBar.high, state.stockPrice);
+                currentBar.low = Math.min(currentBar.low, state.stockPrice);
+                currentBar.volume += Math.floor(Math.random() * 15 + 1);
+            }
+
+            calculateKD(state.candles);
+            calculateBollingerBands(state.candles);
+            checkSignals();
+            updateOrderBook();
+            updateHUD();
+            renderChart();
+        }
+
+        // 檢查多空交易訊號
+        function checkSignals() {
+            if (state.candles.length < 2) return;
+            const curr = state.candles[state.candles.length - 1];
+            const prev = state.candles[state.candles.length - 2];
+
+            // 死亡交叉 (放空訊號)
+            if (curr.high >= curr.upper && prev.k > 75 && prev.k >= prev.d && curr.k < curr.d) {
+                dom.signalBadge.classList.remove('hidden');
+                dom.signalBadge.className = 'absolute top-2 left-2 bg-emerald-600/90 text-white font-bold text-[10px] md:text-xs px-2 py-1 md:px-3 md:py-1.5 rounded-full shadow-lg animate-pulse-fast';
+                dom.signalBadge.innerHTML = '⚡ 觸頂回落！放空訊號';
+                if (!state.signalAlerted) {
+                    audio.short();
+                    updateKingAdvice("⚡【放空訊號】股價觸碰布林上軌，KD高檔死叉！快準備放空！");
+                    state.signalAlerted = true;
+                }
+            } 
+            // 黃金交叉 (做多訊號)
+            else if (curr.low <= curr.lower && prev.k < 25 && prev.k <= prev.d && curr.k > curr.d) {
+                dom.signalBadge.classList.remove('hidden');
+                dom.signalBadge.className = 'absolute top-2 left-2 bg-red-600/90 text-white font-bold text-[10px] md:text-xs px-2 py-1 md:px-3 md:py-1.5 rounded-full shadow-lg animate-pulse-fast';
+                dom.signalBadge.innerHTML = '🔥 超賣反彈！做多訊號';
+                if (!state.signalAlerted) {
+                    audio.win();
+                    updateKingAdvice("🔥【做多訊號】股價跌至布林下軌，KD低檔金叉！有買盤湧入，準備搶反彈做多！");
+                    state.signalAlerted = true;
+                }
+            } else {
+                dom.signalBadge.classList.add('hidden');
+                state.signalAlerted = false; // 重置訊號發布狀態
+            }
+        }
+
+        // 更新微觀五檔報價 (Level 2)
+        function updateOrderBook() {
+            const p = state.stockPrice;
+            const step = 0.5;
+
+            dom.askContainer.innerHTML = '';
+            dom.bidContainer.innerHTML = '';
+
+            // 委賣
+            for (let i = 5; i >= 1; i--) {
+                let askP = +(p + i * step).toFixed(1);
+                let qty = Math.floor(Math.random() * 80 + 10);
+                if (state.signalAlerted && i >= 3) qty += Math.floor(Math.random() * 200 + 100); 
+                dom.askContainer.appendChild(createOrderRow(`賣${['', '一', '二', '三', '四', '五'][i]}`, askP, qty, 'down'));
+            }
+
+            dom.currentTickPrice.innerText = p.toFixed(1);
+
+            // 委買
+            for (let i = 1; i <= 5; i++) {
+                let bidP = +(p - i * step).toFixed(1);
+                let qty = Math.floor(Math.random() * 80 + 10);
+                if (state.signalAlerted && i <= 3) qty += Math.floor(Math.random() * 200 + 100);
+                dom.bidContainer.appendChild(createOrderRow(`買${['', '一', '二', '三', '四', '五'][i]}`, bidP, qty, 'up'));
+            }
+
+            const totalVol = state.innerVolume + state.outerVolume;
+            const innerPct = totalVol === 0 ? 50 : Math.round((state.innerVolume / totalVol) * 100);
+            const outerPct = 100 - innerPct;
+
+            dom.innerBar.style.width = `${innerPct}%`;
+            dom.outerBar.style.width = `${outerPct}%`;
+            dom.innerRatio.innerText = `${innerPct}%`;
+            dom.outerRatio.innerText = `${outerPct}%`;
+        }
 
         function createOrderRow(label, price, qty, type) {
             const row = document.createElement('div');
