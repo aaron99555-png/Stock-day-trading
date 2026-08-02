@@ -673,14 +673,17 @@
 
             ctx.clearRect(0, 0, w, h);
 
-            const candleRegionHeight = h * 0.65;
-            const kdRegionTop = h * 0.70;
-            const kdRegionHeight = h * 0.30;
+            // 重新分配區域高度比例: 主圖 55%, 成交量 20%, KD 25%
+            const candleRegionHeight = h * 0.55;
+            const volRegionTop = h * 0.55;
+            const volRegionHeight = h * 0.20;
+            const kdRegionTop = h * 0.75;
+            const kdRegionHeight = h * 0.25;
 
             const candles = state.candles;
             if (candles.length === 0) return;
 
-            // 計算最高最低價 (包含布林軌道範圍)
+            // --- 計算主圖(K線/布林) Y 軸範圍 ---
             let minP = Infinity, maxP = -Infinity;
             candles.forEach(c => {
                 minP = Math.min(minP, c.low, c.lower);
@@ -691,14 +694,22 @@
             maxP += pRange * 0.05;
             pRange = maxP - minP;
 
+            // --- 計算成交量 Y 軸範圍 ---
+            let maxVol = 0;
+            candles.forEach(c => {
+                maxVol = Math.max(maxVol, c.volume);
+            });
+            maxVol = maxVol * 1.1 || 1; // 預留 10% 頂部空間
+
             const paddingLeft = 10;
             const paddingRight = 50;
             const chartW = w - paddingLeft - paddingRight;
             const candleW = Math.max(2, chartW / candles.length);
             
+            // 價格對應 Y 座標的 Helper
             let getY = (price) => candleRegionHeight - ((price - minP) / pRange) * candleRegionHeight;
 
-            // 1. 繪製背景網格格線
+            // 1. 繪製背景網格格線 (只在主圖區繪製)
             ctx.strokeStyle = '#1e293b';
             ctx.lineWidth = 1;
             for (let i = 1; i <= 4; i++) {
@@ -770,7 +781,7 @@
                 let lowY = getY(c.low);
 
                 let isUp = c.close >= c.open;
-                let color = isUp ? '#ef4444' : '#22c55e'; // 台股規範: 紅漲跌綠
+                let color = isUp ? '#ef4444' : '#22c55e';
 
                 // 畫影線
                 ctx.strokeStyle = color;
@@ -808,7 +819,36 @@
                 ctx.fillText(`${labelText}成本 $${state.avgPrice.toFixed(1)}`, w - 100, entryY - 4);
             }
 
-            // 4. KD 指標副圖區域繪製
+            // --- 3.5 繪製成交量副圖 (Volume) ---
+            // 畫成交量區域的頂部與底部邊線
+            ctx.strokeStyle = '#334155'; // slate-700
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, volRegionTop); ctx.lineTo(w, volRegionTop);
+            ctx.moveTo(0, volRegionTop + volRegionHeight); ctx.lineTo(w, volRegionTop + volRegionHeight);
+            ctx.stroke();
+
+            candles.forEach((c, i) => {
+                let x = paddingLeft + i * candleW + candleW / 2;
+                let volH = (c.volume / maxVol) * volRegionHeight;
+                let volY = volRegionTop + volRegionHeight - volH;
+                
+                // 根據該 K 線收盤開盤關係決定成交量柱顏色
+                let isUp = c.close >= c.open;
+                // 用稍暗的紅綠色來區分主圖 K 線
+                ctx.fillStyle = isUp ? 'rgba(239, 68, 68, 0.7)' : 'rgba(34, 197, 94, 0.7)'; 
+                
+                // 讓成交量柱稍微寬一點，填滿感更好
+                ctx.fillRect(x - candleW * 0.4, volY, candleW * 0.8, volH);
+            });
+
+            // 在成交量區域右下角標示最大量
+            ctx.fillStyle = '#64748b'; // slate-500
+            ctx.font = '9px monospace';
+            ctx.fillText(Math.round(maxVol).toLocaleString(), w - paddingRight + 5, volRegionTop + volRegionHeight - 2);
+
+
+            // --- 4. 繪製 KD 指標副圖區域 ---
             let getKdY = (val) => kdRegionTop + kdRegionHeight - (val / 100) * kdRegionHeight;
 
             ctx.strokeStyle = '#334155';
