@@ -86,7 +86,8 @@
                         <span id="stockPriceDisplay" class="font-mono text-lg md:text-2xl font-black text-tw-up">100.0</span>
                         <span id="stockChangeDisplay" class="font-mono text-[10px] md:text-sm text-tw-up font-bold">+2.5 (+2.56%)</span>
                     </div>
-                    <div class="text-[9px] md:text-xs text-slate-400 flex gap-2 md:gap-4 mt-0.5">
+                    <div class="text-[9px] md:text-xs text-slate-400 flex flex-wrap gap-1.5 md:gap-4 mt-0.5">
+                        <span>開:<span id="openPrice" class="font-mono text-slate-200 ml-0.5">100.0</span></span>
                         <span>高:<span id="highPrice" class="font-mono text-tw-up ml-0.5">102.5</span></span>
                         <span>低:<span id="lowPrice" class="font-mono text-tw-down ml-0.5">97.5</span></span>
                         <span>總量:<span id="totalVolume" class="font-mono text-amber-400 ml-0.5">1,240</span></span>
@@ -827,12 +828,12 @@
                 high = Math.max(high, c.high);
                 low = Math.min(low, c.low);
             });
-            dom.openPrice.innerText = state.candles[0]?.open.toFixed(1) || p.toFixed(1);
-            dom.highPrice.innerText = high.toFixed(1);
-            dom.lowPrice.innerText = low.toFixed(1);
+            if (dom.openPrice) dom.openPrice.innerText = state.candles[0]?.open.toFixed(1) || p.toFixed(1);
+            if (dom.highPrice) dom.highPrice.innerText = high.toFixed(1);
+            if (dom.lowPrice) dom.lowPrice.innerText = low.toFixed(1);
 
             let totalVol = state.candles.reduce((acc, c) => acc + c.volume, 0);
-            dom.totalVolume.innerText = `${totalVol.toLocaleString()} 張`;
+            if (dom.totalVolume) dom.totalVolume.innerText = `${totalVol.toLocaleString()} 張`;
 
             // 計算未實現損益
             let unrealizedPnl = 0;
