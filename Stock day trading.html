@@ -205,30 +205,46 @@
 
     <!-- 選擇關卡 Modal -->
     <div id="levelModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
-            <h2 class="text-xl font-black text-amber-400 mb-1 flex items-center gap-2">🎯 選擇關卡章節</h2>
-            <p class="text-xs text-slate-400 mb-4">掌握不同行情類型下的當沖眉角與風險控管</p>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl flex flex-col max-h-[85vh]">
+            <h2 class="text-xl font-black text-amber-400 mb-1 flex items-center gap-2 shrink-0">🎯 選擇關卡章節</h2>
+            <p class="text-xs text-slate-400 mb-4 shrink-0">掌握不同行情類型下的當沖眉角與風險控管</p>
             
-            <div class="flex flex-col gap-3">
-                <button class="level-select-btn text-left p-3 rounded-xl border border-slate-700 hover:border-amber-500 bg-slate-800/50 hover:bg-slate-800 transition" data-level="1">
+            <div class="flex flex-col gap-3 overflow-y-auto pr-1 no-scrollbar pb-2">
+                <button class="level-select-btn text-left p-3 rounded-xl border border-slate-700 hover:border-amber-500 bg-slate-800/50 hover:bg-slate-800 transition shrink-0" data-level="1">
                     <div class="font-bold text-sm text-slate-200">關卡一：觸頂回落 - 布林上軌放空</div>
                     <div class="text-xs text-slate-400 mt-1">股價急拉觸碰布林上軌，KD 指標 > 80 高檔死叉，五檔賣單壓頂。獲利目標 +3%</div>
                 </button>
-                <button class="level-select-btn text-left p-3 rounded-xl border border-slate-700 hover:border-amber-500 bg-slate-800/50 hover:bg-slate-800 transition" data-level="2">
+                <button class="level-select-btn text-left p-3 rounded-xl border border-slate-700 hover:border-amber-500 bg-slate-800/50 hover:bg-slate-800 transition shrink-0" data-level="2">
                     <div class="font-bold text-sm text-slate-200">關卡二：超賣反彈 - 布林下軌做多</div>
                     <div class="text-xs text-slate-400 mt-1">股價急殺觸碰布林下軌，KD 指標 < 20 低檔金叉，買盤湧現。獲利目標 +3%</div>
                 </button>
-                <button class="level-select-btn text-left p-3 rounded-xl border border-slate-700 hover:border-amber-500 bg-slate-800/50 hover:bg-slate-800 transition" data-level="3">
+                <button class="level-select-btn text-left p-3 rounded-xl border border-slate-700 hover:border-amber-500 bg-slate-800/50 hover:bg-slate-800 transition shrink-0" data-level="3">
                     <div class="font-bold text-sm text-slate-200">關卡三：布林通道收斂突破</div>
                     <div class="text-xs text-slate-400 mt-1">盤整期布林軌道縮口，隨後爆量突破，順勢追多或追空！獲利目標 +5%</div>
                 </button>
-                <button class="level-select-btn text-left p-3 rounded-xl border border-slate-700 hover:border-amber-500 bg-slate-800/50 hover:bg-slate-800 transition" data-level="4">
-                    <div class="font-bold text-sm text-slate-200">關卡四：無盡自由當沖 (SandBox)</div>
-                    <div class="text-xs text-slate-400 mt-1">隨機生成市場波動，考驗您的雙向操作與技術分析。</div>
+                <button class="level-select-btn text-left p-3 rounded-xl border border-slate-700 hover:border-amber-500 bg-slate-800/50 hover:bg-slate-800 transition shrink-0" data-level="4">
+                    <div class="font-bold text-sm text-slate-200">關卡四：假突破真殺盤 (牛市陷阱)</div>
+                    <div class="text-xs text-slate-400 mt-1">突破前高引誘散戶追價，隨即大單砸盤。看見長黑跌破上軌果斷放空！獲利目標 +4%</div>
+                </button>
+                <button class="level-select-btn text-left p-3 rounded-xl border border-slate-700 hover:border-amber-500 bg-slate-800/50 hover:bg-slate-800 transition shrink-0" data-level="5">
+                    <div class="font-bold text-sm text-slate-200">關卡五：階梯式緩跌 (溫水煮青蛙)</div>
+                    <div class="text-xs text-slate-400 mt-1">弱勢空頭格局，反彈無力。順勢操作，逢高放空或跌破均線追空。獲利目標 +4%</div>
+                </button>
+                <button class="level-select-btn text-left p-3 rounded-xl border border-slate-700 hover:border-amber-500 bg-slate-800/50 hover:bg-slate-800 transition shrink-0" data-level="6">
+                    <div class="font-bold text-sm text-slate-200">關卡六：強勢妖股軋空</div>
+                    <div class="text-xs text-slate-400 mt-1">強勢多頭格局，屢創新高。切勿輕易摸頭放空，拉回布林中軌有撐則做多！獲利目標 +6%</div>
+                </button>
+                <button class="level-select-btn text-left p-3 rounded-xl border border-slate-700 hover:border-amber-500 bg-slate-800/50 hover:bg-slate-800 transition shrink-0" data-level="7">
+                    <div class="font-bold text-sm text-slate-200">關卡七：震盪死魚盤</div>
+                    <div class="text-xs text-slate-400 mt-1">上下波動極小，布林通道極度壓縮。考驗耐心，高出低進微利當沖。獲利目標 +2%</div>
+                </button>
+                <button class="level-select-btn text-left p-3 rounded-xl border border-slate-700 hover:border-amber-500 bg-slate-800/50 hover:bg-slate-800 transition shrink-0" data-level="8">
+                    <div class="font-bold text-sm text-slate-200">關卡八：無盡自由當沖 (SandBox)</div>
+                    <div class="text-xs text-slate-400 mt-1">隨機生成不可預測的市場波動，綜合考驗您的雙向操作與盤感。</div>
                 </button>
             </div>
 
-            <button id="btnCloseModal" class="mt-5 w-full py-2 bg-slate-800 text-slate-300 font-bold rounded-lg text-xs hover:bg-slate-700">關閉</button>
+            <button id="btnCloseModal" class="mt-4 w-full py-2 bg-slate-800 text-slate-300 font-bold rounded-lg text-xs hover:bg-slate-700 shrink-0">關閉</button>
         </div>
     </div>
 
@@ -447,6 +463,22 @@
                 state.stockName = "6547 飆爆生技 (軌道突破)";
                 state.levelGoalPct = 0.05;
                 baseP = 210.0;
+            } else if (level === 4) {
+                state.stockName = "2498 假摔光電 (假突破真殺盤)";
+                state.levelGoalPct = 0.04;
+                baseP = 160.0;
+            } else if (level === 5) {
+                state.stockName = "2609 沉船航運 (階梯緩跌)";
+                state.levelGoalPct = 0.04;
+                baseP = 75.0;
+            } else if (level === 6) {
+                state.stockName = "5269 飛天雲端 (強勢軋空)";
+                state.levelGoalPct = 0.06;
+                baseP = 350.0;
+            } else if (level === 7) {
+                state.stockName = "2881 死魚金控 (震盪盤整)";
+                state.levelGoalPct = 0.02;
+                baseP = 50.0;
             } else {
                 state.stockName = "9999 自由市場模式";
                 state.levelGoalPct = 0.10;
@@ -495,6 +527,15 @@
                 bias = (lastC.close < lastC.lower && lastK < 20) ? volatility * 1.2 : (Math.random() - 0.55) * volatility;
             } else if (state.currentLevel === 3) {
                 bias = (Math.random() > 0.8) ? (Math.random() - 0.5) * volatility * 3 : (Math.random() - 0.5) * volatility * 0.5;
+            } else if (state.currentLevel === 4) { // 假突破真殺盤
+                bias = (lastC.close > lastC.upper) ? -volatility * 1.8 : volatility * 0.55; 
+            } else if (state.currentLevel === 5) { // 階梯緩跌
+                bias = -volatility * 0.35; 
+            } else if (state.currentLevel === 6) { // 強勢軋空
+                bias = volatility * 0.4; 
+            } else if (state.currentLevel === 7) { // 震盪死魚盤
+                volatility = state.stockPrice * 0.0015; // 降低波動率
+                bias = (state.stockPrice > state.basePrice) ? -volatility * 0.5 : volatility * 0.5; // 均值回歸
             } else {
                 bias = (Math.random() - 0.52) * volatility;
             }
